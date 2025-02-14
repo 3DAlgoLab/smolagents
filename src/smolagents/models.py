@@ -101,15 +101,22 @@ class ChatMessage:
     def from_hf_api(cls, message, raw) -> "ChatMessage":
         tool_calls = None
         if getattr(message, "tool_calls", None) is not None:
-            tool_calls = [ChatMessageToolCall.from_hf_api(tool_call) for tool_call in message.tool_calls]
-        return cls(role=message.role, content=message.content, tool_calls=tool_calls, raw=raw)
+            tool_calls = [
+                ChatMessageToolCall.from_hf_api(tool_call)
+                for tool_call in message.tool_calls
+            ]
+        return cls(
+            role=message.role, content=message.content, tool_calls=tool_calls, raw=raw
+        )
 
     @classmethod
     def from_dict(cls, data: dict) -> "ChatMessage":
         if data.get("tool_calls"):
             tool_calls = [
                 ChatMessageToolCall(
-                    function=ChatMessageToolCallDefinition(**tc["function"]), id=tc["id"], type=tc["type"]
+                    function=ChatMessageToolCallDefinition(**tc["function"]),
+                    id=tc["id"],
+                    type=tc["type"],
                 )
                 for tc in data["tool_calls"]
             ]
@@ -204,7 +211,9 @@ def get_clean_message_list(
     for message in message_list:
         role = message["role"]
         if role not in MessageRole.roles():
-            raise ValueError(f"Incorrect role {role}, only {MessageRole.roles()} are supported for now.")
+            raise ValueError(
+                f"Incorrect role {role}, only {MessageRole.roles()} are supported for now."
+            )
 
         if role in role_conversions:
             message["role"] = role_conversions[role]
@@ -212,19 +221,30 @@ def get_clean_message_list(
         if isinstance(message["content"], list):
             for element in message["content"]:
                 if element["type"] == "image":
-                    assert not flatten_messages_as_text, f"Cannot use images with {flatten_messages_as_text=}"
+                    assert not flatten_messages_as_text, (
+                        f"Cannot use images with {flatten_messages_as_text=}"
+                    )
                     if convert_images_to_image_urls:
                         element.update(
                             {
                                 "type": "image_url",
-                                "image_url": {"url": make_image_url(encode_image_base64(element.pop("image")))},
+                                "image_url": {
+                                    "url": make_image_url(
+                                        encode_image_base64(element.pop("image"))
+                                    )
+                                },
                             }
                         )
                     else:
                         element["image"] = encode_image_base64(element["image"])
 
-        if len(output_message_list) > 0 and message["role"] == output_message_list[-1]["role"]:
-            assert isinstance(message["content"], list), "Error: wrong content:" + str(message["content"])
+        if (
+            len(output_message_list) > 0
+            and message["role"] == output_message_list[-1]["role"]
+        ):
+            assert isinstance(message["content"], list), "Error: wrong content:" + str(
+                message["content"]
+            )
             if flatten_messages_as_text:
                 output_message_list[-1]["content"] += message["content"][0]["text"]
             else:
@@ -386,7 +406,9 @@ class HfApiModel(Model):
         self.provider = provider
         if token is None:
             token = os.getenv("HF_TOKEN")
-        self.client = InferenceClient(self.model_id, provider=provider, token=token, timeout=timeout)
+        self.client = InferenceClient(
+            self.model_id, provider=provider, token=token, timeout=timeout
+        )
         self.custom_role_conversions = custom_role_conversions
 
     def __call__(
@@ -442,7 +464,7 @@ class MLXModel(Model):
     ... )
     >>> messages = [
     ...     {
-    ...         "role": "user", 
+    ...         "role": "user",
     ...         "content": [
     ...             {"type": "text", "text": "Explain quantum mechanics in simple terms."}
     ...         ]
@@ -470,7 +492,9 @@ class MLXModel(Model):
         import mlx_lm
 
         self.model_id = model_id
-        self.model, self.tokenizer = mlx_lm.load(model_id, tokenizer_config={"trust_remote_code": trust_remote_code})
+        self.model, self.tokenizer = mlx_lm.load(
+            model_id, tokenizer_config={"trust_remote_code": trust_remote_code}
+        )
         self.stream_generate = mlx_lm.stream_generate
         self.tool_name_key = tool_name_key
         self.tool_arguments_key = tool_arguments_key
@@ -490,7 +514,9 @@ class MLXModel(Model):
                         ChatMessageToolCall(
                             id=uuid.uuid4(),
                             type="function",
-                            function=ChatMessageToolCallDefinition(name=tool_name, arguments=tool_arguments),
+                            function=ChatMessageToolCallDefinition(
+                                name=tool_name, arguments=tool_arguments
+                            ),
                         )
                     ],
                 )
@@ -527,7 +553,9 @@ class MLXModel(Model):
         self.last_output_token_count = 0
         text = ""
 
-        for _ in self.stream_generate(self.model, self.tokenizer, prompt=prompt_ids, **completion_kwargs):
+        for _ in self.stream_generate(
+            self.model, self.tokenizer, prompt=prompt_ids, **completion_kwargs
+        ):
             self.last_output_token_count += 1
             text += _.text
             for stop_sequence in prepared_stop_sequences:
@@ -591,12 +619,19 @@ class TransformersModel(Model):
                 "Please install 'transformers' extra to use 'TransformersModel': `pip install 'smolagents[transformers]'`"
             )
         import torch
-        from transformers import AutoModelForCausalLM, AutoModelForImageTextToText, AutoProcessor, AutoTokenizer
+        from transformers import (
+            AutoModelForCausalLM,
+            AutoModelForImageTextToText,
+            AutoProcessor,
+            AutoTokenizer,
+        )
 
         default_model_id = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
         if model_id is None:
             model_id = default_model_id
-            logger.warning(f"`model_id`not provided, using this default tokenizer for token counts: '{model_id}'")
+            logger.warning(
+                f"`model_id`not provided, using this default tokenizer for token counts: '{model_id}'"
+            )
         self.model_id = model_id
         self.kwargs = kwargs
         if device_map is None:
@@ -613,7 +648,9 @@ class TransformersModel(Model):
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         except ValueError as e:
             if "Unrecognized configuration class" in str(e):
-                self.model = AutoModelForImageTextToText.from_pretrained(model_id, device_map=device_map)
+                self.model = AutoModelForImageTextToText.from_pretrained(
+                    model_id, device_map=device_map, trust_remote_code=trust_remote_code
+                )
                 self.processor = AutoProcessor.from_pretrained(model_id)
                 self._is_vlm = True
             else:
@@ -624,9 +661,13 @@ class TransformersModel(Model):
             )
             self.model_id = default_model_id
             self.tokenizer = AutoTokenizer.from_pretrained(default_model_id)
-            self.model = AutoModelForCausalLM.from_pretrained(model_id, device_map=device_map, torch_dtype=torch_dtype)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id, device_map=device_map, torch_dtype=torch_dtype
+            )
 
-    def make_stopping_criteria(self, stop_sequences: List[str], tokenizer) -> "StoppingCriteriaList":
+    def make_stopping_criteria(
+        self, stop_sequences: List[str], tokenizer
+    ) -> "StoppingCriteriaList":
         from transformers import StoppingCriteria, StoppingCriteriaList
 
         class StopOnStrings(StoppingCriteria):
@@ -639,9 +680,16 @@ class TransformersModel(Model):
                 self.stream = ""
 
             def __call__(self, input_ids, scores, **kwargs):
-                generated = self.tokenizer.decode(input_ids[0][-1], skip_special_tokens=True)
+                generated = self.tokenizer.decode(
+                    input_ids[0][-1], skip_special_tokens=True
+                )
                 self.stream += generated
-                if any([self.stream.endswith(stop_string) for stop_string in self.stop_strings]):
+                if any(
+                    [
+                        self.stream.endswith(stop_string)
+                        for stop_string in self.stop_strings
+                    ]
+                ):
                     return True
                 return False
 
@@ -681,7 +729,9 @@ class TransformersModel(Model):
             images = [Image.open(image) for image in images] if images else None
             prompt_tensor = self.processor.apply_chat_template(
                 messages,
-                tools=[get_tool_json_schema(tool) for tool in tools_to_call_from] if tools_to_call_from else None,
+                tools=[get_tool_json_schema(tool) for tool in tools_to_call_from]
+                if tools_to_call_from
+                else None,
                 return_tensors="pt",
                 tokenize=True,
                 return_dict=True,
@@ -691,7 +741,9 @@ class TransformersModel(Model):
         else:
             prompt_tensor = self.tokenizer.apply_chat_template(
                 messages,
-                tools=[get_tool_json_schema(tool) for tool in tools_to_call_from] if tools_to_call_from else None,
+                tools=[get_tool_json_schema(tool) for tool in tools_to_call_from]
+                if tools_to_call_from
+                else None,
                 return_tensors="pt",
                 return_dict=True,
                 add_generation_prompt=True if tools_to_call_from else False,
@@ -702,7 +754,10 @@ class TransformersModel(Model):
 
         if stop_sequences:
             stopping_criteria = self.make_stopping_criteria(
-                stop_sequences, tokenizer=self.processor if hasattr(self, "processor") else self.tokenizer
+                stop_sequences,
+                tokenizer=self.processor
+                if hasattr(self, "processor")
+                else self.tokenizer,
             )
         else:
             stopping_criteria = None
@@ -742,7 +797,9 @@ class TransformersModel(Model):
             try:
                 parsed_output = json.loads(output)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Tool call '{output}' has an invalid JSON structure: {e}")
+                raise ValueError(
+                    f"Tool call '{output}' has an invalid JSON structure: {e}"
+                )
             tool_name = parsed_output.get("name")
             tool_arguments = parsed_output.get("arguments")
             return ChatMessage(
@@ -752,7 +809,9 @@ class TransformersModel(Model):
                     ChatMessageToolCall(
                         id="".join(random.choices("0123456789", k=5)),
                         type="function",
-                        function=ChatMessageToolCallDefinition(name=tool_name, arguments=tool_arguments),
+                        function=ChatMessageToolCallDefinition(
+                            name=tool_name, arguments=tool_arguments
+                        ),
                     )
                 ],
                 raw={"out": out, "completion_kwargs": completion_kwargs},
@@ -828,7 +887,9 @@ class LiteLLMModel(Model):
         self.last_input_token_count = response.usage.prompt_tokens
         self.last_output_token_count = response.usage.completion_tokens
         message = ChatMessage.from_dict(
-            response.choices[0].message.model_dump(include={"role", "content", "tool_calls"})
+            response.choices[0].message.model_dump(
+                include={"role", "content", "tool_calls"}
+            )
         )
         message.raw = response
 
@@ -908,7 +969,9 @@ class OpenAIServerModel(Model):
         self.last_output_token_count = response.usage.completion_tokens
 
         message = ChatMessage.from_dict(
-            response.choices[0].message.model_dump(include={"role", "content", "tool_calls"})
+            response.choices[0].message.model_dump(
+                include={"role", "content", "tool_calls"}
+            )
         )
         message.raw = response
         if tools_to_call_from is not None:
@@ -948,11 +1011,18 @@ class AzureOpenAIServerModel(OpenAIServerModel):
         if api_key is None:
             api_key = os.environ.get("AZURE_OPENAI_API_KEY")
 
-        super().__init__(model_id=model_id, api_key=api_key, custom_role_conversions=custom_role_conversions, **kwargs)
+        super().__init__(
+            model_id=model_id,
+            api_key=api_key,
+            custom_role_conversions=custom_role_conversions,
+            **kwargs,
+        )
         # if we've reached this point, it means the openai package is available (checked in baseclass) so go ahead and import it
         import openai
 
-        self.client = openai.AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=azure_endpoint)
+        self.client = openai.AzureOpenAI(
+            api_key=api_key, api_version=api_version, azure_endpoint=azure_endpoint
+        )
 
 
 __all__ = [

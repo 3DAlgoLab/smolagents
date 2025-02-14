@@ -4,7 +4,7 @@ from smolagents import CodeAgent, HfApiModel, Tool
 from smolagents.default_tools import VisitWebpageTool
 
 
-load_dotenv()
+# load_dotenv()
 
 
 class GetCatImageTool(Tool):
@@ -15,7 +15,9 @@ class GetCatImageTool(Tool):
 
     def __init__(self):
         super().__init__()
-        self.url = "https://em-content.zobj.net/source/twitter/53/robot-face_1f916.png"
+        self.url = (
+            "https://em-content.zobj.net/source/twitter/53/robot-face_1f916.png"
+        )
 
     def forward(self):
         from io import BytesIO
@@ -38,7 +40,7 @@ agent = CodeAgent(
         "requests",
         "markdownify",
     ],  # "duckduckgo-search",
-    use_e2b_executor=True,
+    # use_e2b_executor=True,
 )
 
 agent.run(
